@@ -40,7 +40,7 @@ pub mod your_choose {
         Ok(())
     }
 
-    pub fn get_canditates(context: Context<NewTopic>) -> Result<()> {
+    pub fn get_canditates(context: Context<GetCandidates>) -> Result<()> {
         require!(
             context.accounts.topic.owner == context.accounts.owner.key(),
             Errors::YouAreNotOwner
@@ -53,7 +53,7 @@ pub mod your_choose {
         Ok(())
     }
 
-    pub fn get_participants(context: Context<NewTopic>) -> Result<()> {
+    pub fn get_participants(context: Context<GetParticipants>) -> Result<()> {
         require!(
             context.accounts.topic.owner == context.accounts.owner.key(),
             Errors::YouAreNotOwner
@@ -111,36 +111,30 @@ pub mod your_choose {
     }
 
     pub fn add_vote_to_candidate(context: Context<NewCandidate>, name: String) -> Result<()> {
-        let participants = &mut context.accounts.topic.participants;
+        let topic = &mut context.accounts.topic;
+        let voter_key = context.accounts.owner.key();
 
-        for index in 0..participants.len() {
-            require!(
-                participants[index] == context.accounts.owner.key(),
-                Errors::ErrorInParticipant
-            );
-        }
+        let already_voted = topic.participants.iter().any(|&p| p == voter_key);
+        
+        require!(!already_voted, Errors::ErrorInParticipant); // Error si ya existe
 
-        let candidates = &mut context.accounts.topic.candidates;
-
-        for index in 0..candidates.len() {
-            let new_vote_added = candidates[index].votes + 1;
-
-            if candidates[index].name == name {
-                let new_votes = new_vote_added;
-                candidates[index].votes = new_votes;
+        let mut candidate_found = false;
+        for candidate in topic.candidates.iter_mut() {
+            if candidate.name == name {
+                candidate.votes += 1;
+                candidate_found = true;
                 msg!("El candidato: {} tiene un nuevo voto", name);
-
-                context
-                    .accounts
-                    .topic
-                    .participants
-                    .push(context.accounts.owner.key());
-
-                return Ok(());
+                break;
             }
         }
 
-        Err(Errors::CandidateWasNotFind.into())
+        if !candidate_found {
+            return Err(Errors::CandidateWasNotFind.into());
+        }
+
+        topic.participants.push(voter_key);
+
+        Ok(())
     }
 }
 
@@ -206,4 +200,16 @@ pub struct NewCandidate<'info> {
     pub topic: Account<'info, Topic>,
 
     pub system_program: Program<'info, System>,
+}
+
+#[derive(Accounts)]
+pub struct GetParticipants<'info> {
+    pub topic: Account<'info, Topic>,
+    pub owner: Signer<'info>,
+}
+
+#[derive(Accounts)]
+pub struct GetCandidates<'info> {
+    pub topic: Account<'info, Topic>,
+    pub owner: Signer<'info>,
 }
