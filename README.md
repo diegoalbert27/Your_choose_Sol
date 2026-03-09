@@ -1,60 +1,132 @@
-# Biblioteca en Solana
+# Your Choose — Votación Descentralizada en Solana
 
-![banner](./images/banner-biblioteca.jpg)
+**Your Choose** es un protocolo de votación on-chain construido en Solana usando Rust y el framework Anchor. Permite que cualquier wallet cree un tema de votación, registre candidatos y recolecte un voto verificable por participante — todo aplicado por el propio programa, sin ningún intermediario de confianza.
 
-CRUD básico de un Solana Program desarrollado con Rust y Anchor desde el Solana Playground. 
+---
 
-Puedes comenzar dándole Fork a este repositorio (abajo te explicamos como 👇), **hemos preparado un entorno de codespaces listo para que no tengas que instalar nada**, solo déjate llevar por la fluidez de los ejercicios y temas desarrollados especialmente para ti. 
+## ¿Qué hace?
 
-Asegúrate de clonar este repositorio a tu cuenta usando el botón **`Fork`**.
+El programa administra **Topics** (temas de votación) almacenados en PDAs (Program Derived Addresses) derivadas desde la clave pública del creador. Cada topic contiene una lista de candidatos y un registro de participantes que ya votaron, impidiendo el doble voto a nivel de contrato.
 
-![fork](./images/fork.png)
+### Operaciones principales (CRUD + PDA)
 
-## Importando el proyecto 
+| Instrucción | ¿Quién puede llamarla? | Descripción |
+|---|---|---|
+| `create_topic` | Cualquier wallet | Crea un nuevo tema de votación. La cuenta Topic es una PDA derivada de `["topic", owner_pubkey]`. |
+| `add_candidate` | Solo el dueño del topic | Agrega un nuevo candidato (nombre, 0 votos, activo) al topic. |
+| `get_candidates` | Solo el dueño del topic | Registra en los logs la lista actual de candidatos. |
+| `get_participants` | Solo el dueño del topic | Registra en los logs la lista de wallets que ya votaron. |
+| `update_candidate_state` | Solo el dueño del topic | Activa o desactiva un candidato (toggle del campo `is_active`). |
+| `delete_candidate` | Solo el dueño del topic | Elimina un candidato de la lista permanentemente. |
+| `add_vote_to_candidate` | Cualquier wallet | Registra un voto para un candidato. La wallet del votante se agrega a `participants`; intentos posteriores son rechazados. |
 
-Ya con el repositorio en tu cuenta lo siguiente que debes hacer copiar el `enlace de tu repositorio`, lo que se puede hacer directamente desdel navegador:
+---
 
-![repo](./images/repo.png)
-Posteriormente, lo uniremos con el siguiente enlace en nuestro navegador de preferencia:
+## Arquitectura
 
-```url
-https://beta.solpg.io/
+### Entidades on-chain
+
+```
+Topic (PDA)
+├── owner: Pubkey
+├── topic_name: String (máx. 60 caracteres)
+├── candidates: Vec<Candidate> (máx. 10)
+│   ├── name: String (máx. 60 caracteres)
+│   ├── votes: u32
+│   └── is_active: bool
+└── participants: Vec<Pubkey> (máx. 1000)
 ```
 
-Lo que nos dará algo parecido a:
+![Diagrama de entidades](images/your_choose_entities.png)
 
-![url](./images/url.png)
+### Flujo del programa
 
-Al pulsar enter seremos enviados al `Solana Playground` con nuestro proyecto abierto:
+![Diagrama de flujo](images/your_choose_flow.png)
 
-![pg](./images/pg.png)
+### Diseño de PDAs
 
-Para guardarlo solo damos clic en el boton `import` y asignamos un nombre:
+Las cuentas Topic se derivan de forma determinista:
 
-![import](./images/import.png)
+```
+seeds = ["topic", owner_pubkey]
+```
 
-## Preparacion del entorno
+Esto significa que cada wallet puede ser dueña de exactamente un topic, y la dirección es reproducible desde el cliente sin necesidad de almacenar estado adicional.
 
-Primero conectaremos el entorno con la devnet, lo que tambien procederá a la creación de una wallet. Para eso daremos clic en donde dice **Not Conected**:
+---
 
-![playground1](./images/playground1.png)
+## Manejo de errores
 
-Saldrá la siguiente ventana donde daremos en el botón **Continue**:
+El programa define tres errores personalizados:
 
-![wallet](./images/wallet.png)
+| Error | Cuándo ocurre |
+|---|---|
+| `YouAreNotOwner` | El llamador intenta modificar un topic que no le pertenece. |
+| `CandidateWasNotFind` | El nombre del candidato no existe en la lista del topic. |
+| `ErrorInParticipant` | La wallet ya emitió un voto en este topic. |
 
-Como resultado se mostrará la siguiente información:
+---
 
-![status](./images/status.png)
+## Program ID
 
-* En verde: el estado de la conexión y el entorno al que se encuentra conectado
+```
+BEkiTv1LxUXrfZtQD61Di9MNMzPqRaqBHwcKkdkRrB6A
+```
 
-* En amarillo: la la dirección de la wallet conectada
+---
 
-* En azul: la cantidad de tokens en la wallet
+## Stack tecnológico
 
-> ℹ️ ¿Quieres ver el ejemplo de un "Hola Mundo" en Solana?. Da clic aquí: 👉 [Ver Ejemplo](https://github.com/WayLearnLatam/Solana-starter-kit/tree/1fc6349ba63375a3fe223d8d56911bc64765459b/build-deploy)
+- **Blockchain:** Solana
+- **Lenguaje:** Rust
+- **Framework:** Anchor
+- **Entorno de desarrollo:** Solana Playground
 
-> ℹ️ ¿Cuentas con una Wallet de [Phantom](https://phantom.com/) que deseas importar?, Da clic aquí para ver como hacerlo: 
+---
 
-👉 [Como Importar una Wallet](https://github.com/WayLearnLatam/Solana-starter-kit/tree/1fc6349ba63375a3fe223d8d56911bc64765459b/import-key-a-playground)
+## ¿Cómo usarlo?
+
+### 1. Crear un topic
+
+```typescript
+await program.methods
+  .createTopic("Mejor proyecto Solana 2025")
+  .accounts({ owner: wallet.publicKey, topic: topicPda, systemProgram })
+  .rpc();
+```
+
+### 2. Agregar candidatos
+
+```typescript
+await program.methods
+  .addCandidate("Alice")
+  .accounts({ owner: wallet.publicKey, topic: topicPda, systemProgram })
+  .rpc();
+```
+
+### 3. Votar
+
+```typescript
+await program.methods
+  .addVoteToCandidate("Alice")
+  .accounts({ owner: voterPublicKey, topic: topicPda, systemProgram })
+  .rpc();
+```
+
+### 4. Gestionar candidatos (solo el dueño)
+
+```typescript
+// Activar o desactivar
+await program.methods.updateCandidateState("Alice").accounts({...}).rpc();
+
+// Eliminar permanentemente
+await program.methods.deleteCandidate("Alice").accounts({...}).rpc();
+```
+
+---
+
+## Seguridad
+
+- **Control de propiedad:** Todas las operaciones de escritura verifican que `topic.owner == caller`, retornando `YouAreNotOwner` en caso contrario.
+- **Un voto por wallet:** Antes de registrar un voto, el programa revisa el vector `participants`; los votantes duplicados son rechazados on-chain.
+- **Cuentas basadas en PDAs:** Las cuentas Topic están controladas por el programa, no por ninguna wallet externa, haciendo imposibles las escrituras no autorizadas.
