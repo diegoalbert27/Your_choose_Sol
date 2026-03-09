@@ -167,7 +167,7 @@ pub struct Topic {
     #[max_len(10)]
     candidates: Vec<Candidate>,
 
-    #[max_len(1000)]
+    #[max_len(100)]
     participants: Vec<Pubkey>,
 }
 
