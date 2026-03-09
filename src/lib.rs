@@ -11,7 +11,7 @@ pub mod your_choose {
         msg!("Owner id: {}", owner_id);
 
         let candidates: Vec<Candidate> = Vec::new();
-        let participants: Vec<String> = Vec::new();
+        let participants: Vec<Pubkey> = Vec::new();
 
         context.accounts.topic.set_inner(Topic {
             owner: owner_id,
@@ -42,26 +42,26 @@ pub mod your_choose {
 
     pub fn get_canditates(context: Context<NewTopic>) -> Result<()> {
         require!(
-            context.accounts.topics.owner == context.accounts.owner.key(),
+            context.accounts.topic.owner == context.accounts.owner.key(),
             Errors::YouAreNotOwner
         );
 
         msg!(
             "La lista de candidatos actualmente es: {:#?}",
-            context.accounts.candidates
+            context.accounts.topic.candidates
         );
         Ok(())
     }
 
     pub fn get_participants(context: Context<NewTopic>) -> Result<()> {
         require!(
-            context.accounts.topics.owner == context.accounts.owner.key(),
+            context.accounts.topic.owner == context.accounts.owner.key(),
             Errors::YouAreNotOwner
         );
 
         msg!(
             "La lista de participantes actualmente es: {:#?}",
-            context.accounts.participants
+            context.accounts.topic.participants
         );
         Ok(())
     }
@@ -95,7 +95,7 @@ pub mod your_choose {
     pub fn delete_candidate(context: Context<NewCandidate>, name: String) -> Result<()> {
         require!(
             context.accounts.topic.owner == context.accounts.owner.key(),
-            Errors::YourAreNotOwner
+            Errors::YouAreNotOwner
         );
 
         let candidates = &mut context.accounts.topic.candidates;
@@ -123,10 +123,10 @@ pub mod your_choose {
         let candidates = &mut context.accounts.topic.candidates;
 
         for index in 0..candidates.len() {
-            let newVoteAdded = candidates[index].votes + 1;
+            let new_vote_added = candidates[index].votes + 1;
 
             if candidates[index].name == name {
-                let new_votes = newVoteAdded;
+                let new_votes = new_vote_added;
                 candidates[index].votes = new_votes;
                 msg!("El candidato: {} tiene un nuevo voto", name);
 
